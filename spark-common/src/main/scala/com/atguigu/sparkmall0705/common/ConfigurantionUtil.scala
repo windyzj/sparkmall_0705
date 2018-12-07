@@ -1,7 +1,8 @@
-import org.apache.commons.configuration2.PropertiesConfiguration
-import org.apache.commons.configuration2.FileBasedConfiguration
+package com.atguigu.sparkmall0705.common
+
 import org.apache.commons.configuration2.builder.FileBasedConfigurationBuilder
 import org.apache.commons.configuration2.builder.fluent.Parameters
+import org.apache.commons.configuration2.{FileBasedConfiguration, PropertiesConfiguration}
 
 object ConfigurantionUtil {
 
