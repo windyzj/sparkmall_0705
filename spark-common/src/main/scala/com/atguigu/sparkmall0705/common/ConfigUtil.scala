@@ -4,11 +4,11 @@ import org.apache.commons.configuration2.builder.FileBasedConfigurationBuilder
 import org.apache.commons.configuration2.builder.fluent.Parameters
 import org.apache.commons.configuration2.{FileBasedConfiguration, PropertiesConfiguration}
 
-object ConfigurantionUtil {
+object ConfigUtil {
 
 
   def apply(propertiesName:String) = {
-    val configurationUtil = new ConfigurationUtil()
+    val configurationUtil = new ConfigUtil()
     if (configurationUtil.config == null) {
       configurationUtil.config = new FileBasedConfigurationBuilder[FileBasedConfiguration](classOf[PropertiesConfiguration])
         .configure(new Parameters().properties().setFileName(propertiesName)).getConfiguration
@@ -17,7 +17,7 @@ object ConfigurantionUtil {
   }
 
   def main(args: Array[String]): Unit = {
-    val config: FileBasedConfiguration = ConfigurantionUtil("config.properties").config
+    val config: FileBasedConfiguration = ConfigUtil("config.properties").config
 
     println(config.getString("jdbc.user"))
 
@@ -25,7 +25,7 @@ object ConfigurantionUtil {
 }
 
 
-class ConfigurationUtil(){
+class ConfigUtil(){
   var config:FileBasedConfiguration=null
 
 }

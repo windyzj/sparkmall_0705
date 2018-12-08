@@ -3,8 +3,8 @@ package com.atguigu.sparkmall0705.mock
 import java.text.SimpleDateFormat
 import java.util.UUID
 
-import com.atguigu.sparkmall0705.common.ConfigurantionUtil
-import com.atguigu.sparkmall0705.model.{CityInfo, ProductInfo, UserInfo, UserVisitAction}
+import com.atguigu.sparkmall0705.common.ConfigUtil
+import com.atguigu.sparkmall0705.common.model.{CityInfo, ProductInfo, UserInfo, UserVisitAction}
 import com.atguigu.sparkmall0705.util.{RanOpt, RandomDate, RandomNum, RandomOptions}
 import org.apache.spark.SparkConf
 import org.apache.spark.sql.SparkSession
@@ -71,7 +71,7 @@ object MockerOffline {
   }
 
   def insertHive(sparkSession: SparkSession, tableName: String, dataFrame: DataFrame): Unit = {
-    val config   = ConfigurantionUtil("config.properties").config
+    val config   = ConfigUtil("config.properties").config
     val databaseName: String = config.getString("hive.database")
     if(databaseName!=null){
       sparkSession.sql("use "+databaseName)

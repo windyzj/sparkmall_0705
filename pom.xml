@@ -11,6 +11,7 @@
     <modules>
         <module>spark-common</module>
         <module>spark-mock</module>
+        <module>spark-offline</module>
     </modules>
     <properties>
         <spark.version>2.1.1</spark.version>
