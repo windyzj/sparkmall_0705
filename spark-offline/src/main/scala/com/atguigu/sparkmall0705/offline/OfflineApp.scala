@@ -11,7 +11,7 @@ import com.atguigu.sparkmall0705.offline.utils.SessionAccumulator
 import org.apache.commons.configuration2.FileBasedConfiguration
 import org.apache.spark.SparkConf
 import org.apache.spark.rdd.RDD
-import org.apache.spark.sql.SparkSession
+import org.apache.spark.sql.{SaveMode, SparkSession}
 
 import scala.collection.mutable
 
@@ -82,9 +82,17 @@ object OfflineApp {
     JdbcUtil.executeUpdate("insert into session_stat_info values (?,?,?,?,?,?,?) " ,resultArray)
 
 
+    //需求 按比例抽取session
+    val sessionExtractRDD: RDD[SessionInfo] = SessionExtractApp.sessionExtract(userSessionCount ,taskId,userSessionRDD)
 
-
-
+    import sparkSession.implicits._
+    val  config: FileBasedConfiguration = ConfigUtil("config.properties").config
+    sessionExtractRDD.toDF.write.format("jdbc")
+        .option("url",config.getString("jdbc.url"))
+        .option("user",config.getString("jdbc.user"))
+        .option("password",config.getString("jdbc.password"))
+          .option("dbtable","random_session_info")
+      .mode(SaveMode.Append).save()
 
   }
 
