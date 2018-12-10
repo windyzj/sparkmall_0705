@@ -36,7 +36,7 @@ object OfflineApp {
 
     //      3 求 session总数量，
     val userSessionCount: Long = userSessionRDD.count()  //总数
-
+    println(s"userSessionCount = ${userSessionCount}")
     //    遍历一下全部session，对每个session的类型进行判断 来进行分类的累加  （累加器）
     //    4  分类 ：时长 ，把session里面的每个action进行遍历 ，取出最大时间和最小事件 ，求差得到时长 ，再判断时长是否大于10秒
     //    步长： 计算下session中有多少个action, 判断个数是否大于5
@@ -180,7 +180,18 @@ object OfflineApp {
 //    6 截取前十  .take(10)
 //    7 保存到数据库中
 
+
+
+
+    /////////////////需求四
+
+    CategorySessionTopApp.statCategorySession(config,sparkSession,taskId,userActionRDD,categoryTop10)
+
+    println("需求四保存完成！")
   }
+
+
+
 
 
   def readUserVisitActionRDD(sparkSession: SparkSession,conditionJsonString:String):RDD[UserVisitAction]={
