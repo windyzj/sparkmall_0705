@@ -4,6 +4,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 
 import com.atguigu.sparkmall0705.common.model.UserVisitAction
+import com.atguigu.sparkmall0705.offline.bean.SessionInfo
 import org.apache.spark.rdd.RDD
 
 import scala.collection.mutable

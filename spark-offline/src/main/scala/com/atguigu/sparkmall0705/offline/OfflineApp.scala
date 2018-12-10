@@ -7,13 +7,15 @@ import com.alibaba.fastjson.{JSON, JSONObject}
 import com.atguigu.sparkmall0705.common.ConfigUtil
 import com.atguigu.sparkmall0705.common.model.UserVisitAction
 import com.atguigu.sparkmall0705.common.util.JdbcUtil
-import com.atguigu.sparkmall0705.offline.utils.SessionAccumulator
+import com.atguigu.sparkmall0705.offline.bean.{CategoryTopN, SessionInfo}
+import com.atguigu.sparkmall0705.offline.utils.{CategoryActionCountAccumulator, SessionAccumulator}
 import org.apache.commons.configuration2.FileBasedConfiguration
 import org.apache.spark.SparkConf
 import org.apache.spark.rdd.RDD
 import org.apache.spark.sql.{SaveMode, SparkSession}
 
 import scala.collection.mutable
+import scala.collection.mutable.ListBuffer
 
 object OfflineApp {
 
@@ -82,7 +84,7 @@ object OfflineApp {
     JdbcUtil.executeUpdate("insert into session_stat_info values (?,?,?,?,?,?,?) " ,resultArray)
 
 
-    //需求 按比例抽取session
+    //需求二 按比例抽取session
     val sessionExtractRDD: RDD[SessionInfo] = SessionExtractApp.sessionExtract(userSessionCount ,taskId,userSessionRDD)
 
     import sparkSession.implicits._
@@ -93,6 +95,90 @@ object OfflineApp {
         .option("password",config.getString("jdbc.password"))
           .option("dbtable","random_session_info")
       .mode(SaveMode.Append).save()
+
+ ///////////////////////////////////////////////////////////////////////////
+///////////////////////////需求三/////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////
+    //需求三  根据点击、下单、支付进行排序，取前十名
+    //    1 、遍历所有的访问日志
+    //    map
+    //    2 按照cid+操作类型进行分别累加
+    //    累加器 hashMap[String ,Long]
+    val categoryActionCountAccumulator = new CategoryActionCountAccumulator()
+    sparkSession.sparkContext.register(categoryActionCountAccumulator)
+    userActionRDD.foreach{ userAction=>
+        if(userAction.click_category_id!= -1L){
+          categoryActionCountAccumulator.add(userAction.click_category_id+ "_click")
+          //给当前品类的点击(商品浏览)项进行加1
+        }else if(userAction.order_category_ids!=null&&userAction.order_category_ids.size!=0){
+          //由于订单涉及多个品类，所以用逗号切分 ，循环进行累加
+          val orderCidArr: Array[String] = userAction.order_category_ids.split(",")
+
+          for(orderCid<-orderCidArr){
+             categoryActionCountAccumulator.add(orderCid+ "_order")
+           }
+          //
+        }else if(userAction.pay_category_ids!=null&&userAction.pay_category_ids.size!=0) {
+          //由于支付涉及多个品类，所以用逗号切分 ，循环进行累加
+          val payCidArr: Array[String] = userAction.pay_category_ids.split(",")
+          for(payCid<-payCidArr){
+            categoryActionCountAccumulator.add(payCid+ "_pay")
+          }
+        }
+    }
+    //4 把结果转 cid,clickcount,ordercount,paycount
+    //    CategoryTopN（click ,  hashMap.get(cid+“_click”), hashMap.get(cid+“_order”), hashMap.get(cid+“_pay”) ）
+
+    //      3  得到累加的结果  map[cid_actiontype,count]
+    //    累加器 hashMap[String ,Long]
+    println(categoryActionCountAccumulator.value.mkString("\n"))
+    val actionCountByCidMap: Map[String, mutable.HashMap[String, Long]] = categoryActionCountAccumulator.value.groupBy { case (cidAction, count) => //定义用什么来分组
+      val cid: String = cidAction.split("_")(0)
+      cid //用cid进行分组
+    }
+    //      4 把结果转 cid,clickcount,ordercount,paycount
+    //    CategoryTopN（click ,  hashMap.get(cid+“_click”), hashMap.get(cid+“_order”), hashMap.get(cid+“_pay”) ）
+
+    val categoryTopNList: List[CategoryTopN] = actionCountByCidMap.map { case (cid, actionMap) =>
+      CategoryTopN(taskId, cid, actionMap.getOrElse(cid + "_click", 0L), actionMap.getOrElse(cid + "_order", 0L), actionMap.getOrElse(cid + "_pay", 0L))
+    }.toList
+
+
+    val categoryTop10: List[CategoryTopN] = categoryTopNList.sortWith((ctn1, ctn2) =>
+      if (ctn1.click_count > ctn2.click_count) {
+        true
+      } else if (ctn1.click_count == ctn2.click_count) {
+        if (ctn1.order_count > ctn2.order_count) {
+          true
+        } else {
+          false
+        }
+      } else {
+        false
+      }
+    ).take(10)
+    println(categoryTop10.mkString("\n"))
+   //组合成jdbcUtil插入需要的结构
+    val categoryList = new ListBuffer[Array[Any]]()
+    for ( categoryTopN<- categoryTop10 ) {
+      val paramArray = Array(categoryTopN.taskId,categoryTopN.category_id,categoryTopN.click_count,categoryTopN.order_count,categoryTopN.pay_count)
+      categoryList.append(paramArray)
+    }
+//保存到数据库
+    JdbcUtil.executeBatchUpdate("insert into category_top10 values (?,?,?,?,?) " ,categoryList)
+
+
+//    1 、遍历所有的访问日志
+//    map
+//    2 按照cid+操作类型进行分别累加
+//    累加器 hashMap[String ,Long]
+//      3  得到累加的结果  map[cid_actiontype,count]
+//    累加器 hashMap[String ,Long]
+//      4 把结果转 cid,clickcount,ordercount,paycount
+//    CategoryTopN（click ,  hashMap.get(cid+“_click”), hashMap.get(cid+“_order”), hashMap.get(cid+“_pay”) ）
+//    5 按照点击，下单，支付的次序进行排序   List[CatagoryTopN] .sortWith( function)
+//    6 截取前十  .take(10)
+//    7 保存到数据库中
 
   }
 
