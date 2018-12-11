@@ -188,6 +188,11 @@ object OfflineApp {
     CategorySessionTopApp.statCategorySession(config,sparkSession,taskId,userActionRDD,categoryTop10)
 
     println("需求四保存完成！")
+
+    /////需求五
+    PageConvertRatioApp.calcPageConvertRatio(sparkSession,conditionJsonString,taskId,userActionRDD)
+    println("需求五完成！！")
+
   }
 
 
