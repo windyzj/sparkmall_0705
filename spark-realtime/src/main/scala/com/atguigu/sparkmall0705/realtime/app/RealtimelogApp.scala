@@ -48,6 +48,7 @@ object RealtimelogApp {
 //    val filteredRealtimelog: DStream[RealtimeAdslog] = realtimeLogDSream.filter { realtimeLog =>
 //      !jedisClient.sismember("user_blacklist", realtimeLog.userId)
 //    }
+    //过滤掉黑名单中的用户日志
     val filteredRealtimelog: DStream[RealtimeAdslog]= realtimeLogDSream.transform{rdd=>
       val blackList: util.Set[String] = jedisClient.smembers("user_blacklist")
       val blackListBC: Broadcast[util.Set[String]] = sc.broadcast(blackList)
@@ -57,8 +58,39 @@ object RealtimelogApp {
       filteredRealtimeLogRDD
     }
 
+    /////////////////////////////////////////////////////////////////
+    ///////////////////////////需求8//////////////////////////////////
+    //////////////////////////////////////////////////////////////////
+    //处理 需求8
+    // 把明细变为 [k,v]结构  地区+城市+广告+天+ =>count
+    val areaCityAdsCountDStream: DStream[(String, Long)] = filteredRealtimelog.map { realtimeAdslog =>
+      val key = realtimeAdslog.area + ":" + realtimeAdslog.city + ":" + realtimeAdslog.adsId + ":" + realtimeAdslog.getDateString()
+      (key, 1L)
+    }.reduceByKey(_ + _)
+
+    //
+    //
+    // =>利用updateStatebykey 把历史数据进行汇总，得到最新的汇总数据，然后汇总数据保存到redis
+    sc.setCheckpointDir("./checkpoint")
+    val areaCityAdsTotalCountDstream: DStream[(String, Long)] = areaCityAdsCountDStream.updateStateByKey { (adsCountSeq: Seq[Long], totalCount: Option[Long]) =>
+      val adsCountSum: Long = adsCountSeq.sum
+      val newTotalCount: Long = totalCount.getOrElse(0L) + adsCountSum
+      Some(newTotalCount)
+    }
+    // 把汇总结果写入redis
+    areaCityAdsTotalCountDstream.foreachRDD{  rdd:RDD[(String,Long)]=>
+         val areaCityAdsTotalCountArray: Array[ (String,Long)] = rdd.collect()
+
+      for ( (key,count)<- areaCityAdsTotalCountArray ) {
+        jedisClient.hset("area_city_ads_day_clickcount",key,count.toString)
+      }
+    }
 
 
+
+
+
+    //按天+用户+广告 进行聚合  计算点击量
     //           ->rdd[(userid_adsid_date,1L)  ]-> reducebykey->rdd[(userid_adsid_date,count)]
     val userAdsCountPerDayDSream: DStream[(String, Long)] = filteredRealtimelog.map { realtimelog =>
       val key: String = realtimelog.userId + ":" + realtimelog.adsId + ":" + realtimelog.getDateString()
@@ -67,6 +99,8 @@ object RealtimelogApp {
 
 
 
+
+    //需求七
     //向redis中存放用户点击广告的累计值
     userAdsCountPerDayDSream.foreachRDD {rdd=>
 
@@ -89,17 +123,17 @@ object RealtimelogApp {
         for ( (key,count)<- userAdsCountPerDayArr ) {
           val countString: String = jedisClient.hget("user_ads_count_perday",key)
           //达到阈值 进入黑名单
-          if(countString!=null&&countString.toLong>=10){
+          if(countString!=null&&countString.toLong>=10000){
             val userId: String = key.split(":")(0)
               //黑名单 结构 set
             jedisClient.sadd("user_blacklist",userId)
 
           }
-          jedisClient.hset("user_ads_count_perday",key,count.toString)
+          jedisClient.hincrBy("user_ads_count_perday",key,count)
 
 
         }
-      jedisClient.close()
+
     }
 
     ssc.start()
