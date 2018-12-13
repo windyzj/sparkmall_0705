@@ -93,6 +93,9 @@ object RealtimelogApp {
     println("需求九完成")
 
 
+    LastHourCountPerAds.calcLastHourCountPerAds(filteredRealtimelog)
+    println("需求十完成")
+
 
 
     //按天+用户+广告 进行聚合  计算点击量
