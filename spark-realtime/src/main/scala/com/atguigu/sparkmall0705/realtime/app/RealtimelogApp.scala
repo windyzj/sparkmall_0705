@@ -86,6 +86,11 @@ object RealtimelogApp {
       }
     }
 
+    ///需求九//////////////////////////////////////////
+    /////////////////////////
+
+    AreaTop3AdsPerdayApp.calcTop3Ads(areaCityAdsTotalCountDstream)
+    println("需求九完成")
 
 
 
